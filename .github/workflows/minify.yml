@@ -1,0 +1,28 @@
+name: minify
+run-name: Minify JS/HTML [gh-pages branch]
+
+on:
+  push:
+    branches:
+      - 'main'
+
+jobs:
+  checkout-minify-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+      - run: npm install -g terser
+      - run: npm install -g html-minifier
+
+      - run: terser ./close.js --compress --mangle -o ./close.js
+      - run: html-minifier --collapse-boolean-attributes --collapse-whitespace --minify-css --minify-urls --remove-attribute-quotes --remove-comments --remove-empty-attributes --remove-optional-tags --remove-redundant-attributes --remove-script-type-attributes --remove-style-link-type-attributes --remove-tag-whitespace --use-short-doctype -o index.html index.html
+
+      - run: |
+          git config user.name mrbarge
+          git config user.email mrbarge@user.noreply.github.com
+          git commit -am 'Automated minify of ${{ github.sha }}'
+          git push --force -u origin main:gh-pages
