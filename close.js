@@ -268,6 +268,7 @@ function changeKey(){
 // ── Audio helpers ──────────────────────────────────────────────────────────
 function mkIR(secs,decay){const n=AC.sampleRate*secs,b=AC.createBuffer(2,n,AC.sampleRate);for(let c=0;c<2;c++){const d=b.getChannelData(c);for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/n,decay);}const cv=AC.createConvolver();cv.buffer=b;return cv;}
 function mkSoft(amt){const n=256,c=new Float32Array(n);for(let i=0;i<n;i++){const x=i*2/n-1;c[i]=x*(Math.PI+amt)/(Math.PI+amt*Math.abs(x));}const ws=AC.createWaveShaper();ws.curve=c;ws.oversample='2x';return ws;}
+function mkEcho(dest,dt,fb){const dl=AC.createDelay(2.0);dl.delayTime.value=dt;const fg=AC.createGain();fg.gain.value=fb;dl.connect(fg);fg.connect(dl);dl.connect(dest);return dl;}
 function nearestBuf(bm,midi){const ks=Object.keys(bm).map(Number).filter(k=>bm[k]);if(!ks.length)return null;let b=ks[0],bd=Math.abs(midi-b);for(const k of ks){const d=Math.abs(midi-k);if(d<bd){bd=d;b=k;}}return{buf:bm[b],detune:(midi-b)*100};}
 const jit=amt=>(Math.random()*2-1)*amt;
 const velJ=(v,f=.06)=>Math.max(.05,Math.min(1,v+jit(v*f)));
@@ -322,6 +323,18 @@ const PIANO_PHRASES=[
   {name:'Shimmer sequence',dur:25,build(out){const r=mkIR(10,2.2);r.connect(out);const ru=mkIR(8,2.1);const sg=AC.createGain();sg.gain.value=.3;ru.connect(sg);sg.connect(out);const base=transpose([50,53,57,62,65,69,74].map((m,i)=>({midi:m,time:i*2.8,vel:.85,rel:11})));const up=transpose([50,53,57,62,65,69,74].map((m,i)=>({midi:Math.min(84,m+12),time:i*2.8+.1,vel:.28,rel:10,atk:.2})));const s1=seq(base,r);const s2=seq(up,ru);return()=>{s1();s2();};}},
   {name:'Echo motif',dur:24,build(out){const dl=AC.createDelay(2);dl.delayTime.value=.55;const fb=AC.createGain();fb.gain.value=.4;const r=mkIR(8,2.2);dl.connect(fb);fb.connect(dl);dl.connect(r);r.connect(out);const d=AC.createGain();d.gain.value=.18;d.connect(out);return seq(transpose([{midi:62,time:0,vel:.86,rel:6},{midi:60,time:1.5,vel:.80,rel:6},{midi:57,time:3,vel:.84,rel:8},{midi:62,time:9,vel:.64,rel:6},{midi:60,time:10.5,vel:.58,rel:6},{midi:57,time:12,vel:.62,rel:9}]),dl,{extra:d});}},
   {name:'Nanou fragment',dur:50,build(out){const r=mkIR(18,2.8);r.connect(out);return seq(transpose([{midi:62,time:0,vel:.84,rel:20},{midi:57,time:8,vel:.78,rel:20},{midi:60,time:17,vel:.82,rel:20},{midi:53,time:26,vel:.75,rel:22}]),r);}},
+  {name:'Half pair q-qq qq',dur:26,build(out){const r=mkIR(11,2.4);r.connect(out);const d=AC.createGain();d.gain.value=.22;d.connect(out);return seq(transpose([{midi:65,time:0,vel:.76,rel:4},{midi:62,time:1.4,vel:.80,rel:5},{midi:58,time:5.5,vel:.72,rel:2},{midi:57,time:6.2,vel:.74,rel:2},{midi:55,time:6.6,vel:.80,rel:5},{midi:60,time:10.5,vel:.70,rel:2},{midi:62,time:10.9,vel:.76,rel:4},{midi:57,time:17,vel:.84,rel:20}]),r,{extra:d});}},
+  {name:'qqq half qq',dur:22,build(out){const r=mkIR(11,2.4);r.connect(out);const d=AC.createGain();d.gain.value=.22;d.connect(out);return seq(transpose([{midi:60,time:0,vel:.70,rel:2},{midi:62,time:0.4,vel:.72,rel:2},{midi:65,time:0.8,vel:.78,rel:5},{midi:57,time:5.5,vel:.76,rel:4},{midi:55,time:6.9,vel:.80,rel:5},{midi:60,time:12,vel:.72,rel:2},{midi:62,time:12.4,vel:.84,rel:20}]),r,{extra:d});}},
+  {name:'qq quarter qq-q qq',dur:22,build(out){const r=mkIR(11,2.4);r.connect(out);const d=AC.createGain();d.gain.value=.22;d.connect(out);return seq(transpose([{midi:62,time:0,vel:.76,rel:2},{midi:65,time:0.4,vel:.72,rel:4},{midi:60,time:3.5,vel:.74,rel:3},{midi:58,time:4.2,vel:.78,rel:5},{midi:55,time:7.5,vel:.70,rel:2},{midi:53,time:7.9,vel:.72,rel:2},{midi:55,time:8.6,vel:.80,rel:6},{midi:58,time:12.5,vel:.72,rel:2},{midi:57,time:12.9,vel:.84,rel:18}]),r,{extra:d});}},
+  {name:'Low single qq h-qq',dur:24,build(out){const r=mkIR(11,2.4);r.connect(out);const d=AC.createGain();d.gain.value=.22;d.connect(out);return seq(transpose([{midi:50,time:0,vel:.82,rel:6},{midi:57,time:4.5,vel:.72,rel:2},{midi:60,time:4.9,vel:.76,rel:4},{midi:62,time:8.5,vel:.74,rel:3},{midi:65,time:9.9,vel:.70,rel:2},{midi:67,time:10.3,vel:.78,rel:5},{midi:57,time:16,vel:.84,rel:20}]),r,{extra:d});}},
+  {name:'q-qq qq-q qq',dur:20,build(out){const r=mkIR(11,2.4);r.connect(out);const d=AC.createGain();d.gain.value=.22;d.connect(out);return seq(transpose([{midi:57,time:0,vel:.74,rel:2},{midi:60,time:0.7,vel:.72,rel:2},{midi:62,time:1.1,vel:.80,rel:5},{midi:65,time:5.5,vel:.72,rel:2},{midi:62,time:5.9,vel:.70,rel:2},{midi:60,time:6.6,vel:.78,rel:5},{midi:55,time:11.5,vel:.70,rel:2},{midi:53,time:11.9,vel:.82,rel:20}]),r,{extra:d});}},
+  {name:'Descending qq figures',dur:22,build(out){const r=mkIR(11,2.4);r.connect(out);const d=AC.createGain();d.gain.value=.22;d.connect(out);return seq(transpose([{midi:67,time:0,vel:.76,rel:2},{midi:65,time:0.4,vel:.72,rel:4},{midi:62,time:4,vel:.74,rel:2},{midi:60,time:4.4,vel:.70,rel:4},{midi:58,time:8,vel:.72,rel:2},{midi:57,time:8.4,vel:.76,rel:5},{midi:53,time:13,vel:.84,rel:20}]),r,{extra:d});}},
+  {name:'q-qq pairs qqq close',dur:24,build(out){const r=mkIR(11,2.4);r.connect(out);const d=AC.createGain();d.gain.value=.22;d.connect(out);return seq(transpose([{midi:62,time:0,vel:.78,rel:2},{midi:65,time:0.7,vel:.74,rel:2},{midi:67,time:1.1,vel:.76,rel:5},{midi:60,time:5,vel:.76,rel:4},{midi:57,time:6.4,vel:.80,rel:5},{midi:62,time:10.5,vel:.72,rel:3},{midi:60,time:11.2,vel:.74,rel:4},{midi:57,time:14.5,vel:.70,rel:2},{midi:55,time:14.9,vel:.72,rel:2},{midi:53,time:15.3,vel:.82,rel:20}]),r,{extra:d});}},
+  {name:'Low rise qq qqq quarter',dur:18,build(out){const r=mkIR(11,2.4);r.connect(out);const d=AC.createGain();d.gain.value=.22;d.connect(out);return seq(transpose([{midi:50,time:0,vel:.80,rel:3},{midi:52,time:0.4,vel:.76,rel:5},{midi:55,time:4.5,vel:.70,rel:2},{midi:57,time:4.9,vel:.72,rel:2},{midi:60,time:5.3,vel:.76,rel:5},{midi:62,time:9.5,vel:.74,rel:3},{midi:65,time:10.2,vel:.82,rel:20}]),r,{extra:d});}},
+  {name:'Dense qq q-qq qqq qq',dur:22,build(out){const r=mkIR(11,2.4);r.connect(out);const d=AC.createGain();d.gain.value=.22;d.connect(out);return seq(transpose([{midi:65,time:0,vel:.74,rel:2},{midi:62,time:0.4,vel:.78,rel:4},{midi:60,time:3.5,vel:.70,rel:2},{midi:58,time:4.2,vel:.72,rel:2},{midi:55,time:4.6,vel:.78,rel:5},{midi:57,time:8.5,vel:.68,rel:2},{midi:58,time:8.9,vel:.70,rel:2},{midi:60,time:9.3,vel:.74,rel:4},{midi:57,time:13,vel:.70,rel:2},{midi:55,time:13.4,vel:.80,rel:20}]),r,{extra:d});}},
+  {name:'Cross-register bursts',dur:22,build(out){const r=mkIR(11,2.4);r.connect(out);const d=AC.createGain();d.gain.value=.22;d.connect(out);return seq(transpose([{midi:69,time:0,vel:.74,rel:3},{midi:67,time:0.4,vel:.70,rel:4},{midi:53,time:4.5,vel:.80,rel:3},{midi:55,time:5.2,vel:.76,rel:2},{midi:57,time:5.6,vel:.74,rel:5},{midi:62,time:9.5,vel:.72,rel:2},{midi:65,time:9.9,vel:.68,rel:4},{midi:57,time:13.5,vel:.74,rel:3},{midi:55,time:14.2,vel:.80,rel:20}]),r,{extra:d});}},
+  {name:'qq bookends qqq mid',dur:20,build(out){const r=mkIR(11,2.4);r.connect(out);const d=AC.createGain();d.gain.value=.22;d.connect(out);return seq(transpose([{midi:60,time:0,vel:.76,rel:2},{midi:62,time:0.4,vel:.80,rel:5},{midi:57,time:5.5,vel:.70,rel:2},{midi:58,time:5.9,vel:.72,rel:2},{midi:60,time:6.3,vel:.78,rel:5},{midi:55,time:12,vel:.72,rel:2},{midi:53,time:12.4,vel:.84,rel:20}]),r,{extra:d});}},
+  {name:'Half qqq half qq',dur:26,build(out){const r=mkIR(11,2.4);r.connect(out);const d=AC.createGain();d.gain.value=.22;d.connect(out);return seq(transpose([{midi:65,time:0,vel:.76,rel:4},{midi:62,time:1.4,vel:.80,rel:5},{midi:58,time:5.5,vel:.70,rel:2},{midi:60,time:5.9,vel:.72,rel:2},{midi:62,time:6.3,vel:.76,rel:4},{midi:57,time:11,vel:.74,rel:4},{midi:55,time:12.4,vel:.78,rel:5},{midi:60,time:17,vel:.70,rel:2},{midi:62,time:17.4,vel:.84,rel:20}]),r,{extra:d});}},
 ];
 function schedulePiano(){
   if(!playing)return;
@@ -330,7 +343,7 @@ function schedulePiano(){
     const out=AC.createGain();out.gain.value=.88;out.connect(mGain);
     let dur=8;
     if(Math.random()<.45){const ph=PIANO_PHRASES[0|Math.random()*PIANO_PHRASES.length];ph.build(out);dur=ph.dur;setLog('piano · '+ph.name+' · '+currentKey.name);}
-    else{const fx=PIANO_FX[0|Math.random()*PIANO_FX.length];fx.fn(out,pianoVoice(),v,sp);dur=10;setLog('piano · '+fx.name+' · '+currentKey.name);}
+    else{if(Math.random()<.25){const r=mkIR(1.2+Math.random()*.6,1.5);r.connect(out);const echoIn=mkEcho(r,.2+Math.random()*.35,.28+Math.random()*.18);const dryG=AC.createGain();dryG.gain.value=.45;dryG.connect(out);hit(pianoVoice(),echoIn,{v:v*1.3,rel:7,spread:sp,extra:dryG});setLog('piano · echo · '+currentKey.name);}else{const fx=PIANO_FX[0|Math.random()*PIANO_FX.length];fx.fn(out,pianoVoice(),v,sp);setLog('piano · '+fx.name+' · '+currentKey.name);}dur=10;}
     mark('piano',1,'pia');setTimeout(()=>mark('piano',0,'pia'),dur*1000);
   }
   piSchedId=setTimeout(schedulePiano,(18+Math.random()*30)*1000);
@@ -338,9 +351,10 @@ function schedulePiano(){
 
 // ── Cello ──────────────────────────────────────────────────────────────────
 const CELLO_PHRASES=[
-  {name:'slow descent',dur:26,build(out,k){const pool=k.scale.filter(n=>n>=36&&n<=52);const notes=pool.slice(0,Math.min(4,pool.length)).reverse();const r=mkIR(7,2.0);r.connect(out);const d=AC.createGain();d.gain.value=.3;d.connect(out);return seqBuf(celloBufs,notes.map((m,i)=>({midi:m,time:i*5.0,vel:velJ(.84,.05),rel:14,atk:.5})),r,{extra:d});}},
-  {name:'slow ascent',dur:22,build(out,k){const pool=k.scale.filter(n=>n>=36&&n<=52);const notes=pool.slice(0,Math.min(4,pool.length));const r=mkIR(7,2.0);r.connect(out);const d=AC.createGain();d.gain.value=.3;d.connect(out);return seqBuf(celloBufs,notes.map((m,i)=>({midi:m,time:i*4.5,vel:velJ(.82,.05),rel:13,atk:.48})),r,{extra:d});}},
-  {name:'two-note motif',dur:32,build(out,k){const pool=k.scale.filter(n=>n>=40&&n<=52);const m1=pool[0|Math.random()*Math.min(3,pool.length)],m2=pool[Math.min(pool.indexOf(m1)+2,pool.length-1)];const r=mkIR(6,1.9);r.connect(out);const d=AC.createGain();d.gain.value=.32;d.connect(out);return seqBuf(celloBufs,[{midi:m1,time:0,vel:velJ(.86,.05),rel:13,atk:.5},{midi:m2,time:4,vel:velJ(.80,.05),rel:13,atk:.48},{midi:m1,time:15,vel:velJ(.82,.05),rel:14,atk:.5},{midi:m2,time:19,vel:velJ(.76,.05),rel:15,atk:.48}],r,{extra:d});}},
+  {name:'slow descent',dur:30,build(out,k){const pool=k.scale.filter(n=>n>=36&&n<=52);const notes=pool.slice(0,Math.min(4,pool.length)).reverse();const r=mkIR(7,2.0);r.connect(out);const d=AC.createGain();d.gain.value=.3;d.connect(out);return seqBuf(celloBufs,notes.map((m,i)=>({midi:m,time:i*5.0,vel:velJ(.84,.05),rel:18,atk:.5})),r,{extra:d});}},
+  {name:'slow ascent',dur:28,build(out,k){const pool=k.scale.filter(n=>n>=36&&n<=52);const notes=pool.slice(0,Math.min(4,pool.length));const r=mkIR(7,2.0);r.connect(out);const d=AC.createGain();d.gain.value=.3;d.connect(out);return seqBuf(celloBufs,notes.map((m,i)=>({midi:m,time:i*4.5,vel:velJ(.82,.05),rel:18,atk:.48})),r,{extra:d});}},
+  {name:'two-note motif',dur:36,build(out,k){const pool=k.scale.filter(n=>n>=40&&n<=52);const m1=pool[0|Math.random()*Math.min(3,pool.length)],m2=pool[Math.min(pool.indexOf(m1)+2,pool.length-1)];const r=mkIR(6,1.9);r.connect(out);const d=AC.createGain();d.gain.value=.32;d.connect(out);return seqBuf(celloBufs,[{midi:m1,time:0,vel:velJ(.86,.05),rel:16,atk:.5},{midi:m2,time:4,vel:velJ(.80,.05),rel:16,atk:.48},{midi:m1,time:15,vel:velJ(.82,.05),rel:18,atk:.5},{midi:m2,time:19,vel:velJ(.76,.05),rel:20,atk:.48}],r,{extra:d});}},
+  {name:'octave drop',dur:28,build(out,k){const pool=k.scale.filter(n=>n>=45&&n<=60);if(!pool.length)return;const m1=pool[0|Math.random()*pool.length];const m2=Math.max(36,m1-12);const gap=4+Math.random()*4;const r=mkIR(7,2.0);r.connect(out);const d=AC.createGain();d.gain.value=.3;d.connect(out);return seqBuf(celloBufs,[{midi:m1,time:0,vel:velJ(.84,.05),rel:18,atk:.52},{midi:m2,time:gap,vel:velJ(.80,.05),rel:20,atk:.55}],r,{extra:d});}}
 ];
 function playCello(){
   if(!playing||!celLoaded||active.cello)return;
@@ -348,7 +362,7 @@ function playCello(){
   let dur=12;const r2=Math.random();
   if(r2<.4){const ph=CELLO_PHRASES[0|Math.random()*CELLO_PHRASES.length];ph.build(out,k);dur=ph.dur;setLog('cello · '+ph.name+' · '+k.name);}
   else if(r2<.75){const bassPool=k.scale.filter(n=>n>=36&&n<=52);if(!bassPool.length)return;const midi=bassPool[0|Math.random()*Math.min(5,bassPool.length)];const r=mkIR(3.5,1.8);r.connect(out);const d=AC.createGain();d.gain.value=.35;d.connect(out);hitBuf(celloBufs,[midi],r,{v:velJ(.86,.05),rel:16,atk:.55,extra:d});dur=16;setLog('cello · '+k.name);}
-  else{const bassPool=k.scale.filter(n=>n>=38&&n<=55);if(bassPool.length<2)return;const i1=0|Math.random()*Math.max(1,bassPool.length-3);const m1=bassPool[i1],m2=bassPool[Math.min(i1+(0|Math.random()*3+1),bassPool.length-1)];const r=mkIR(4,1.9);r.connect(out);const d=AC.createGain();d.gain.value=.3;d.connect(out);seqBuf(celloBufs,[{midi:m1,time:0,vel:velJ(.85,.05),rel:15,atk:.5},{midi:m2,time:velJ(1.8,.15),vel:velJ(.80,.05),rel:15,atk:.5}],r,{extra:d});dur=18;setLog('cello · '+k.name);}
+  else{const bassPool=k.scale.filter(n=>n>=38&&n<=55);if(bassPool.length<2)return;const i1=0|Math.random()*Math.max(1,bassPool.length-3);const m1=bassPool[i1],m2=bassPool[Math.min(i1+(0|Math.random()*3+1),bassPool.length-1)];const r=mkIR(4,1.9);r.connect(out);const d=AC.createGain();d.gain.value=.3;d.connect(out);seqBuf(celloBufs,[{midi:m1,time:0,vel:velJ(.85,.05),rel:15,atk:.5},{midi:m2,time:1.8+jit(.5),vel:velJ(.80,.05),rel:15,atk:.5}],r,{extra:d});dur=18;setLog('cello · '+k.name);}
   mark('cello',1,'cel');setTimeout(()=>mark('cello',0,'cel'),dur*1000);
 }
 function scheduleCello(){if(!playing)return;if(Math.random()<.65)playCello();celSchedId=setTimeout(scheduleCello,(22+Math.random()*28)*1000);}
@@ -364,7 +378,8 @@ function playHarp(){
     const start=dir>0?0|Math.random()*Math.max(1,pool.length-len):pool.length-1-(0|Math.random()*Math.max(1,pool.length-len));
     const picked=[];for(let i=0;i<len;i++)picked.push(pool[Math.max(0,Math.min(pool.length-1,start+i*dir))]);
     const gap=1.8+Math.random()*1.2,rv=mkIR(5,1.9);rv.connect(out);const d=AC.createGain();d.gain.value=.28;d.connect(out);
-    seqBuf(harpBufs,picked.map((m,i)=>({midi:m,time:i*gap,vel:velJ(.80,.06),rel:7,atk:.01})),rv,{extra:d});
+    const haDest=Math.random()<.30?mkEcho(rv,.15+Math.random()*.25,.28+Math.random()*.18):rv;
+    seqBuf(harpBufs,picked.map((m,i)=>({midi:m,time:i*gap,vel:velJ(.80,.06),rel:7,atk:.01})),haDest,{extra:d});
     dur=len*(gap+1)+6;setLog('harp · arpeggio · '+k.name);
   } else if(r<.75){
     const bassPool=k.scale.filter(n=>n>=40&&n<=55),midPool=k.penta.filter(n=>n>=55&&n<=72);
@@ -379,7 +394,8 @@ function playHarp(){
     const bassPool=k.scale.filter(n=>n>=40&&n<=57);if(!bassPool.length)return;
     const midi=bassPool[0|Math.random()*Math.min(5,bassPool.length)];
     const rv=mkIR(6,2.1);rv.connect(out);
-    seqBuf(harpBufs,[{midi,time:0,vel:velJ(.86,.05),rel:8,atk:.01}],rv);
+    const hpDest=Math.random()<.20?mkEcho(rv,.2+Math.random()*.3,.25+Math.random()*.15):rv;
+    seqBuf(harpBufs,[{midi,time:0,vel:velJ(.86,.05),rel:8,atk:.01}],hpDest);
     dur=10;setLog('harp · '+k.name);
   }
   mark('harp',1,'har');setTimeout(()=>mark('harp',0,'har'),dur*1000);
