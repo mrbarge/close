@@ -231,13 +231,17 @@ const PIANO_FILES={48:'C3',51:'Ds3',54:'Fs3',57:'A3',60:'C4',63:'Ds4',66:'Fs4',6
 function noteToMidi(n){const names=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];const m=n.match(/^([A-G]#?)(\d)$/);if(!m)return 60;return names.indexOf(m[1])+(parseInt(m[2])+1)*12;}
 const CELLO_FILES=['C2','E2','G2','A2','C3','E3','G3','A3','C4','E4','G4','A4'];
 const HARP_FILES=['E1','G1','B1','C2','D2','E2','G2','A2','B2','C3','D3','E3','G3','A3','B3','C4','D4','E4','G4','A4','B4','C5','D5','E5'];
-const pianoBufs={},celloBufs={},harpBufs={};
-let piLoaded=false,celLoaded=false,harLoaded=false;
+// Contrabass files — note names use 's' for sharp (CDN convention); bassNoteToMidi normalises to '#'
+const BASS_FILES=['A1','A2','A3','C2','C3','C4','Ds2','Ds3','Fs1','Fs2','Fs3'];
+const bassNoteToMidi=n=>noteToMidi(n.replace('s','#'));
+const pianoBufs={},celloBufs={},harpBufs={},bassBufs={};
+let piLoaded=false,celLoaded=false,harLoaded=false,basLoaded=false;
 let AC=null,mGain=null,sRev=null,audioAnalyser=null;
 let playing=false;
 let schedId=null,piSchedId=null,celSchedId=null,harSchedId=null,keySchedId=null;
 const active={drone:0,pad:0,melody:0,texture:0,piano:0,cello:0,harp:0};
 const droneRefs=[];
+const bassRefs=[];
 
 // ── Key system ─────────────────────────────────────────────────────────────
 function midiToHz(m){return 440*Math.pow(2,(m-69)/12);}
@@ -259,6 +263,7 @@ function changeKey(){
   const next=KEYS.filter((_,i)=>i!==keyIdx)[Math.floor(Math.random()*(KEYS.length-1))];
   keyIdx=KEYS.indexOf(next);currentKey=next;
   retuneDrone(next);
+  retuneContrabass(next);
   keyMinor=isMinor();visScenes[visCur].setKey(keyMinor);
   const el=document.getElementById('key-name');
   el.textContent=next.name;el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');
@@ -307,7 +312,7 @@ const hit=(m,d,o)=>hitBuf(pianoBufs,m,d,o);
 const seq=(ev,d,o)=>seqBuf(pianoBufs,ev,d,o);
 
 // ── Piano ──────────────────────────────────────────────────────────────────
-function pianoVoice(){const k=currentKey,pool=k.scale.filter(n=>n>=48&&n<=74),pPool=k.penta.filter(n=>n>=50&&n<=72);if(!pool.length||!pPool.length)return[60];const r=Math.random();if(r<.22)return[pPool[0|Math.random()*pPool.length]];if(r<.44){const root=pool[0|Math.random()*Math.min(8,pool.length)];return[root,root+7].filter(n=>n<=84);}if(r<.70){const di=0|Math.random()*Math.max(1,pool.length-4);return[pool[di],pool[Math.min(di+2,pool.length-1)],pool[Math.min(di+4,pool.length-1)]].filter(Boolean);}const di=0|Math.random()*Math.max(1,pool.length-6);return[pool[di],(pool[di+2]||pool[di+1]),(pool[di+4]||pool[di+3]),(pool[di+6]||pool[di+5])].filter(Boolean);}
+function pianoVoice(){const k=currentKey,pool=k.scale.filter(n=>n>=48&&n<=74),pPool=k.penta.filter(n=>n>=50&&n<=72);if(!pool.length||!pPool.length)return[60];const r=Math.random();if(r<.22)return[pPool[0|Math.random()*pPool.length]];if(r<.44){const root=pool[0|Math.random()*Math.min(8,pool.length)];const fifth=root+7;return(pool.includes(fifth)?[root,fifth]:[root]).filter(n=>n<=84);}if(r<.70){const di=0|Math.random()*Math.max(1,pool.length-4);return[pool[di],pool[Math.min(di+2,pool.length-1)],pool[Math.min(di+4,pool.length-1)]].filter(Boolean);}const di=0|Math.random()*Math.max(1,pool.length-6);return[pool[di],(pool[di+2]||pool[di+1]),(pool[di+4]||pool[di+3]),(pool[di+6]||pool[di+5])].filter(Boolean);}
 const PIANO_FX=[
   {name:'studio',fn(out,m,v,sp){const r=mkIR(1.0,1.5);r.connect(out);const d=AC.createGain();d.gain.value=.5;d.connect(out);return hit(m,r,{v:v*1.3,rel:7,spread:sp,extra:d});}},
   {name:'live room',fn(out,m,v,sp){const r=mkIR(1.8,1.7);r.connect(out);const d=AC.createGain();d.gain.value=.35;d.connect(out);return hit(m,r,{v:v*1.4,rel:7,spread:sp,extra:d});}},
@@ -351,8 +356,8 @@ function schedulePiano(){
 
 // ── Cello ──────────────────────────────────────────────────────────────────
 const CELLO_PHRASES=[
-  {name:'slow descent',dur:30,build(out,k){const pool=k.scale.filter(n=>n>=36&&n<=52);const notes=pool.slice(0,Math.min(4,pool.length)).reverse();const r=mkIR(7,2.0);r.connect(out);const d=AC.createGain();d.gain.value=.3;d.connect(out);return seqBuf(celloBufs,notes.map((m,i)=>({midi:m,time:i*5.0,vel:velJ(.84,.05),rel:18,atk:.5})),r,{extra:d});}},
-  {name:'slow ascent',dur:28,build(out,k){const pool=k.scale.filter(n=>n>=36&&n<=52);const notes=pool.slice(0,Math.min(4,pool.length));const r=mkIR(7,2.0);r.connect(out);const d=AC.createGain();d.gain.value=.3;d.connect(out);return seqBuf(celloBufs,notes.map((m,i)=>({midi:m,time:i*4.5,vel:velJ(.82,.05),rel:18,atk:.48})),r,{extra:d});}},
+  {name:'slow descent',dur:30,build(out,k){const pool=k.scale.filter(n=>n>=36&&n<=52);const start=0|Math.random()*Math.max(1,pool.length-4);const notes=pool.slice(start,start+4).reverse();const r=mkIR(7,2.0);r.connect(out);const d=AC.createGain();d.gain.value=.3;d.connect(out);return seqBuf(celloBufs,notes.map((m,i)=>({midi:m,time:i*5.0,vel:velJ(.84,.05),rel:18,atk:.5})),r,{extra:d});}},
+  {name:'slow ascent',dur:28,build(out,k){const pool=k.scale.filter(n=>n>=36&&n<=52);const start=0|Math.random()*Math.max(1,pool.length-4);const notes=pool.slice(start,start+4);const r=mkIR(7,2.0);r.connect(out);const d=AC.createGain();d.gain.value=.3;d.connect(out);return seqBuf(celloBufs,notes.map((m,i)=>({midi:m,time:i*4.5,vel:velJ(.82,.05),rel:18,atk:.48})),r,{extra:d});}},
   {name:'two-note motif',dur:36,build(out,k){const pool=k.scale.filter(n=>n>=40&&n<=52);const m1=pool[0|Math.random()*Math.min(3,pool.length)],m2=pool[Math.min(pool.indexOf(m1)+2,pool.length-1)];const r=mkIR(6,1.9);r.connect(out);const d=AC.createGain();d.gain.value=.32;d.connect(out);return seqBuf(celloBufs,[{midi:m1,time:0,vel:velJ(.86,.05),rel:16,atk:.5},{midi:m2,time:4,vel:velJ(.80,.05),rel:16,atk:.48},{midi:m1,time:15,vel:velJ(.82,.05),rel:18,atk:.5},{midi:m2,time:19,vel:velJ(.76,.05),rel:20,atk:.48}],r,{extra:d});}},
   {name:'octave drop',dur:28,build(out,k){const pool=k.scale.filter(n=>n>=45&&n<=60);if(!pool.length)return;const m1=pool[0|Math.random()*pool.length];const m2=Math.max(36,m1-12);const gap=4+Math.random()*4;const r=mkIR(7,2.0);r.connect(out);const d=AC.createGain();d.gain.value=.3;d.connect(out);return seqBuf(celloBufs,[{midi:m1,time:0,vel:velJ(.84,.05),rel:18,atk:.52},{midi:m2,time:gap,vel:velJ(.80,.05),rel:20,atk:.55}],r,{extra:d});}}
 ];
@@ -379,7 +384,7 @@ function playHarp(){
     const picked=[];for(let i=0;i<len;i++)picked.push(pool[Math.max(0,Math.min(pool.length-1,start+i*dir))]);
     const gap=1.8+Math.random()*1.2,rv=mkIR(5,1.9);rv.connect(out);const d=AC.createGain();d.gain.value=.28;d.connect(out);
     const haDest=Math.random()<.30?mkEcho(rv,.15+Math.random()*.25,.28+Math.random()*.18):rv;
-    seqBuf(harpBufs,picked.map((m,i)=>({midi:m,time:i*gap,vel:velJ(.80,.06),rel:7,atk:.01})),haDest,{extra:d});
+    let t=0;seqBuf(harpBufs,picked.map(m=>{const ev={midi:m,time:t,vel:velJ(.80,.06),rel:7,atk:.01};t+=gap+jit(gap*.35);return ev;}),haDest,{extra:d});
     dur=len*(gap+1)+6;setLog('harp · arpeggio · '+k.name);
   } else if(r<.75){
     const bassPool=k.scale.filter(n=>n>=40&&n<=55),midPool=k.penta.filter(n=>n>=55&&n<=72);
@@ -393,9 +398,9 @@ function playHarp(){
   } else {
     const bassPool=k.scale.filter(n=>n>=40&&n<=57);if(!bassPool.length)return;
     const midi=bassPool[0|Math.random()*Math.min(5,bassPool.length)];
-    const rv=mkIR(6,2.1);rv.connect(out);
+    const rv=mkIR(6,2.1);rv.connect(out);const d=AC.createGain();d.gain.value=.32;d.connect(out);
     const hpDest=Math.random()<.20?mkEcho(rv,.2+Math.random()*.3,.25+Math.random()*.15):rv;
-    seqBuf(harpBufs,[{midi,time:0,vel:velJ(.86,.05),rel:8,atk:.01}],hpDest);
+    seqBuf(harpBufs,[{midi,time:0,vel:velJ(.86,.05),rel:8,atk:.01}],hpDest,{extra:d});
     dur=10;setLog('harp · '+k.name);
   }
   mark('harp',1,'har');setTimeout(()=>mark('harp',0,'har'),dur*1000);
@@ -416,6 +421,47 @@ function startDrone(){
   mark('drone',1,'syn');
 }
 function retuneDrone(newKey){const t=AC.currentTime;droneRefs.forEach(({osc,iv,det})=>{osc.frequency.linearRampToValueAtTime(midiToHz(newKey.root-12)*Math.pow(2,iv/12)+det,t+12);});}
+
+// ── Contrabass drone ────────────────────────────────────────────────────────
+function startContrabass(){
+  if(!basLoaded||!playing)return;
+  const now=AC.currentTime;
+  // Two notes: root-12 (unison with synth drone) and root-24 (sub-bass presence)
+  [currentKey.root-12,Math.max(currentKey.root-24,28)].forEach((midi,i)=>{
+    const s=nearestBuf(bassBufs,midi);if(!s)return;
+    const src=AC.createBufferSource();
+    src.buffer=s.buf;
+    src.loop=true;
+    src.loopStart=0.1; // skip any attack transient in the loop
+    src.detune.value=s.detune+(Math.random()-.5)*6;
+    // Slow LFO wobble to match synth drone character
+    const lfo=AC.createOscillator(),lg=AC.createGain();
+    lfo.frequency.value=.03+Math.random()*.04;
+    lg.gain.value=5+Math.random()*4; // ±5–9 cents depth
+    lfo.connect(lg);lg.connect(src.detune);lfo.start();
+    // Lowpass: softens loop seam artifacts, keeps it seated in the low-mid bed
+    const fi=AC.createBiquadFilter();fi.type='lowpass';fi.frequency.value=380;fi.Q.value=.65;
+    const g=AC.createGain();
+    const vol=i===0?.20:.12; // root-12 present, root-24 sub-bass body
+    g.gain.setValueAtTime(0,now);
+    g.gain.linearRampToValueAtTime(vol,now+10); // 10s swell — same unhurried pace as drone
+    src.connect(fi);fi.connect(g);g.connect(sRev); // shares global reverb, same as synth drone
+    src.start(now);
+    bassRefs.push({src,gain:g,lfo});
+  });
+}
+function retuneContrabass(newKey){
+  // Fade existing notes over ~12s (matched to synth drone retune duration)
+  const t=AC.currentTime;
+  bassRefs.forEach(({src,gain,lfo})=>{
+    gain.gain.setTargetAtTime(0,t,3.5);
+    try{src.stop(t+20);}catch(e){}
+    try{lfo.stop(t+20);}catch(e){}
+  });
+  bassRefs.length=0;
+  // Swell in the new key after a short pause
+  if(playing)setTimeout(()=>{if(playing)startContrabass();},3000);
+}
 function playPad(){
   if(!playing)return;const pool=currentKey.penta.filter(n=>n>=48&&n<=69);if(pool.length<2)return;
   const notes=[...pool].sort(()=>Math.random()-.5).slice(0,3);
@@ -477,14 +523,15 @@ const setStatus=s=>document.getElementById('status').textContent=s;
 // ── Sample loading ─────────────────────────────────────────────────────────
 async function tryLoad(url){try{const r=await fetch(url);if(!r.ok)return null;return await AC.decodeAudioData(await r.arrayBuffer());}catch(e){return null;}}
 async function loadAllSamples(){
-  const total=Object.keys(PIANO_FILES).length+CELLO_FILES.length+HARP_FILES.length;
+  const total=Object.keys(PIANO_FILES).length+CELLO_FILES.length+HARP_FILES.length+BASS_FILES.length;
   let done=0;const tick=()=>{done++;setStatus('Loading · '+done+' / '+total);};
   await Promise.all([
     ...Object.entries(PIANO_FILES).map(async([midi,name])=>{const b=await tryLoad(PIANO_CDN+name+'.mp3');if(b)pianoBufs[+midi]=b;tick();}),
     ...CELLO_FILES.map(async n=>{const b=await tryLoad(INST_CDN+'cello/'+n+'.mp3');if(b)celloBufs[noteToMidi(n)]=b;tick();}),
     ...HARP_FILES.map(async n=>{const b=await tryLoad(INST_CDN+'harp/'+n+'.mp3');if(b)harpBufs[noteToMidi(n)]=b;tick();}),
+    ...BASS_FILES.map(async n=>{const b=await tryLoad(INST_CDN+'contrabass/'+n+'.mp3');if(b)bassBufs[bassNoteToMidi(n)]=b;tick();}),
   ]);
-  piLoaded=Object.keys(pianoBufs).length>0;celLoaded=Object.keys(celloBufs).length>0;harLoaded=Object.keys(harpBufs).length>0;
+  piLoaded=Object.keys(pianoBufs).length>0;celLoaded=Object.keys(celloBufs).length>0;harLoaded=Object.keys(harpBufs).length>0;basLoaded=Object.keys(bassBufs).length>0;
   setStatus('');
 }
 
@@ -508,12 +555,14 @@ document.getElementById('btn').addEventListener('click',async()=>{
       setTimeout(schedulePiano,(10+Math.random()*15)*1000);
       setTimeout(scheduleCello,(15+Math.random()*20)*1000);
       setTimeout(scheduleHarp,(20+Math.random()*20)*1000);
+      // Contrabass: swell in after a short pause once samples are ready
+      setTimeout(()=>{if(playing)startContrabass();},(4+Math.random()*4)*1000);
     });
   } else {
     playing=false;document.getElementById('btn').textContent='Play';document.getElementById('btn').classList.remove('active');
     document.getElementById('key-name').textContent='';setStatus('');
     [schedId,piSchedId,celSchedId,harSchedId,keySchedId].forEach(clearTimeout);
-    droneRefs.length=0;Object.keys(active).forEach(k=>active[k]=0);
+    droneRefs.length=0;bassRefs.length=0;Object.keys(active).forEach(k=>active[k]=0);
     if(mGain){mGain.gain.setTargetAtTime(0,AC.currentTime,.4);setTimeout(()=>{try{AC.close();}catch(e){}},2000);}
     audioAnalyser=null;
   }
